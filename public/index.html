@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aizain Chat Engine</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="star-join-toast">🌟 STAR USER Aizain HAS JOINED! 🌟</div>
+
+    <!-- Pink Room Intro Overlay -->
+    <div id="flower-intro">
+        <div class="giant-flower">🌸</div>
+        <div>WELCOME FAVORITE PERSON</div>
+    </div>
+
+    <!-- Login -->
+    <div id="login-container">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/2/2b/Kali-dragon-icon.svg" alt="Portal Logo">
+        <h1>AIZAIN CHAT</h1>
+        <span class="author">Created by Mashrath</span>
+        
+        <input type="text" id="username" placeholder="User Alias">
+        <input type="password" id="room" placeholder="Room ID Code">
+        <div id="error-msg"></div> 
+        
+        <button onclick="joinChat()">ESTABLISH CONNECTION</button>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="admin-container">
+        <div id="admin-header">🔒 ROOT NODE COMMAND CORE</div>
+        <div id="admin-controls">
+            <input type="text" id="targetRoomInput" placeholder="Target Sector ID">
+            <button onclick="adminSpyRoom()">👁️ Intercept Channel</button>
+            <button onclick="adminClearChat()">🧹 Purge Logs</button>
+            <button onclick="adminBanRoom()">🚫 Ban Target Sector</button>
+            <button onclick="window.location.reload()" style="border-color: #617a9e; color: #617a9e;">Logout Terminal</button>
+        </div>
+        <div style="display: flex; flex: 1; overflow: hidden;"><div id="admin-logs"></div></div>
+    </div>
+
+    <div id="admin-target-hub">
+        <h4 id="admin-hub-title" style="color:white; margin:0 0 10px 0; border-bottom:1px solid #333; padding-bottom:5px;">Target</h4>
+        <button onclick="executeHubAction('mute')" style="background:black; color:#00ff66; border:1px solid #00ff66; padding:5px; margin-bottom:5px;">Mute</button>
+        <button onclick="executeHubAction('kick')" style="background:black; color:#ff3333; border:1px solid #ff3333; padding:5px; margin-bottom:5px;">Kick</button>
+        <button onclick="closeAdminHub()" style="background:black; color:gray; border:1px solid gray; padding:5px;">Cancel</button>
+    </div>
+
+    <!-- Ghost Slide up -->
+    <div id="ghost-panel">
+        <h2>⚠️ SECURE ACCESS ACTIVATED</h2>
+        <p>Aizain is welcoming you in private chat rooms.</p>
+        <button onclick="dismissGhostPanel()" style="background: transparent; border: 1px solid #ff3355; color: #ff3355; padding: 8px 20px; cursor: pointer; font-family: monospace; font-weight: bold; border-radius: 4px;">INITIALIZE LOGIC MESH</button>
+    </div>
+
+    <!-- Chat Container -->
+    <div id="chat-container">
+        <div id="chat-header">
+            <div>
+                <span id="roomTitleLabel">Matrix Network Node:</span> <span id="roomNameDisplay" style="color: #0084ff; font-family: monospace;"></span>
+                <div class="room-stats-meta" id="headerMetricsDisplay">Loading metrics...</div>
+            </div>
+            <button class="settings-btn" onclick="toggleSettings()">⚙️</button>
+            <div id="settings-menu">
+                <button onclick="document.getElementById('messages').innerHTML = ''; toggleSettings();">🗑️ Clear Client View</button>
+                <button onclick="window.location.reload()">🚪 Sever Link / Exit</button>
+            </div>
+        </div>
+        
+        <div id="messages"></div>
+
+        <!-- 3-Dots Typing Indicator -->
+        <div id="typing-indicator-container">
+            <span id="typing-username-lbl">User</span> is typing
+            <div class="dots-wrapper">
+                <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+            </div>
+        </div>
+        
+        <div id="replying-indicator">Target Pin: <span id="reply-target"></span> <button style="float:right; border:none; background:none; cursor:pointer;" onclick="cancelReply()">❌</button></div>
+        
+        <div id="emoji-bar">
+            <span onclick="addEmoji('😀')">😀</span><span onclick="addEmoji('😂')">😂</span>
+            <span onclick="addEmoji('❤️')">❤️</span><span onclick="addEmoji('🔥')">🔥</span>
+        </div>
+
+        <div id="input-area">
+            <input type="text" id="messageInput" placeholder="Enter message..." oninput="handleTyping()" onkeypress="if(event.key === 'Enter') sendMessage()">
+            <input type="file" id="imageUpload" accept="image/*" style="display:none;" onchange="sendImage(event)">
+            <button class="btn" style="background-color: #0084ff;" onclick="document.getElementById('imageUpload').click()">🖼️</button>
+            <button class="btn" onclick="sendMessage()">➤</button>
+            <button class="btn" id="micBtn" onclick="toggleMic()">🎤</button>
+        </div>
+    </div>
+
+    <div id="lightbox" onclick="closeLightbox()"><span class="close-txt">CLICK TO DISMISS</span><img id="lightbox-img" src=""></div>
+
+    <div id="context-menu">
+        <div class="context-emoji-row">
+            <span onclick="triggerContextReaction('❤️')">❤️</span><span onclick="triggerContextReaction('👍')">👍</span>
+            <span onclick="triggerContextReaction('😂')">😂</span><span onclick="triggerContextReaction('🔥')">🔥</span>
+        </div>
+        <div class="context-option" onclick="triggerContextCopy()">📋 Copy Text</div>
+        <div class="context-option" onclick="triggerContextReply()">↩️ Reply</div>
+        <div class="context-option" style="color: #ff3333;" onclick="triggerContextDeleteLocally()">🗑️ Delete Locally</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentUsername = "";
+        let currentRoomID = "";
+        let replyingTo = null;
+        
+        let typingTimeoutHandle = null;
+        let localTypingFlag = false;
+
+        let activeContextMessageElement = null;
+        let touchStartTimer = null;
+        let selectedTargetSocketId = null;
+
+        function displayError(msg) {
+            const errBox = document.getElementById("error-msg");
+            errBox.innerText = msg;
+            errBox.style.opacity = "1";
+            setTimeout(() => {
+                errBox.style.opacity = "0";
+                setTimeout(() => errBox.innerText = "", 300);
+            }, 1000); 
+        }
+
+        function joinChat() {
+            const username = document.getElementById("username").value.trim();
+            const room = document.getElementById("room").value.trim();
+
+            if (!username || !room) return displayError("All fields mandatory.");
+
+            if (username === "Aizain" && room === "7889546425") {
+                document.getElementById("login-container").style.display = "none";
+                document.getElementById("admin-container").style.display = "flex";
+                socket.emit("joinRoom", { username: "Host Master", room: "ADMIN_HOST_ROOM" });
+                return;
+            }
+
+            // COMPLETELY FIXED: No spaces in aizain
+            if (username === "aizain" && room === "1301") {
+                currentUsername = "aizain";
+                currentRoomID = "1301";
+                document.body.classList.add("pink-room-active");
+                document.getElementById("roomTitleLabel").innerText = "🌸 Favorite Person Lounge:";
+                document.getElementById("roomNameDisplay").innerText = "aizain";
+                
+                const intro = document.getElementById("flower-intro");
+                intro.style.display = "flex";
+
+                setInterval(generateFallingPetal, 400);
+                socket.emit("joinRoom", { username: currentUsername, room: currentRoomID });
+                
+                document.getElementById("login-container").style.display = "none";
+                document.getElementById("chat-container").style.display = "flex";
+                return;
+            }
+
+            if (!/^\d+$/.test(room)) return displayError("Room ID must be numbers only");
+            if (room.length < 3) return displayError("Room code too short (Min 3)");
+            if (room.length > 10) return displayError("Room code too long (Max 10)");
+
+            currentUsername = username;
+            currentRoomID = room;
+            document.getElementById("roomNameDisplay").innerText = room;
+            
+            const ghost = document.getElementById("ghost-panel");
+            ghost.style.display = "block";
+            setTimeout(() => { ghost.style.bottom = "0"; }, 50);
+        }
+
+        function dismissGhostPanel() {
+            document.getElementById("ghost-panel").style.bottom = "-100%";
+            setTimeout(() => { document.getElementById("ghost-panel").style.display = "none"; }, 500);
+            socket.emit("joinRoom", { username: currentUsername, room: currentRoomID });
+            document.getElementById("login-container").style.display = "none";
+            document.getElementById("chat-container").style.display = "flex";
+            document.body.style.background = "#030a16";
+        }
+
+        function generateFallingPetal() {
+            const petal = document.createElement("span");
+            petal.classList.add("petal");
+            petal.innerHTML = "🌸";
+            petal.style.left = Math.random() * 100 + "vw";
+            petal.style.animationDuration = (Math.random() * 3 + 2) + "s";
+            petal.style.fontSize = (Math.random() * 15 + 12) + "px";
+            document.body.appendChild(petal);
+            setTimeout(() => petal.remove(), 5000);
+        }
+
+        socket.on("roomMetricsUpdate", (data) => {
+            document.getElementById("headerMetricsDisplay").innerText = `${data.userCount} Person(s) | ${data.mediaCount} Media Files`;
+        });
+
+        socket.on("starUserAlert", (msg) => {
+            const toast = document.getElementById("star-join-toast");
+            toast.style.display = "block";
+            toast.style.top = "25px";
+            setTimeout(() => { toast.style.top = "-100px"; setTimeout(() => toast.style.display = "none", 500); }, 4000);
+        });
+
+        function attachContextInputHooks(element) {
+            element.addEventListener("contextmenu", (e) => { e.preventDefault(); openContextMenu(e.clientX, e.clientY, element); });
+            element.addEventListener("touchstart", (e) => { touchStartTimer = setTimeout(() => openContextMenu(e.touches[0].clientX, e.touches[0].clientY, element), 600); });
+            element.addEventListener("touchend", () => clearTimeout(touchStartTimer));
+            element.addEventListener("touchmove", () => clearTimeout(touchStartTimer));
+        }
+        function openContextMenu(x, y, el) {
+            activeContextMessageElement = el;
+            const menu = document.getElementById("context-menu");
+            menu.style.left = (x > window.innerWidth - 190 ? window.innerWidth - 190 : x) + "px";
+            menu.style.top = (y > window.innerHeight - 180 ? window.innerHeight - 180 : y) + "px";
+            menu.style.display = "flex";
+        }
+        document.addEventListener("click", (e) => { if (!e.target.closest("#context-menu")) document.getElementById("context-menu").style.display = "none"; });
+
+        function triggerContextCopy() { navigator.clipboard.writeText(activeContextMessageElement.querySelector(".msg-text-content")?.innerText || ""); document.getElementById("context-menu").style.display = "none"; }
+        function triggerContextDeleteLocally() { activeContextMessageElement.remove(); document.getElementById("context-menu").style.display = "none"; }
+        function triggerContextReply() { startReply(activeContextMessageElement.querySelector("b")?.innerText || "User", activeContextMessageElement.querySelector(".msg-text-content")?.innerText || "Media File"); document.getElementById("context-menu").style.display = "none"; }
+        function triggerContextReaction(emoji) {
+            let badge = activeContextMessageElement.querySelector(".reaction-badge-line");
+            if (!badge) { badge = document.createElement("div"); badge.classList.add("reaction-badge-line"); activeContextMessageElement.appendChild(badge); }
+            badge.innerHTML = `<span>${emoji}</span>`;
+            document.getElementById("context-menu").style.display = "none";
+        }
+
+        function handleTyping() {
+            if (!localTypingFlag) { localTypingFlag = true; socket.emit("typingState", true); }
+            clearTimeout(typingTimeoutHandle);
+            typingTimeoutHandle = setTimeout(() => { localTypingFlag = false; socket.emit("typingState", false); }, 1500); 
+        }
+
+        socket.on("typingBroadcast", (data) => {
+            const container = document.getElementById("typing-indicator-container");
+            if (data.isTyping) {
+                document.getElementById("typing-username-lbl").innerText = data.username;
+                container.style.display = "flex";
+            } else {
+                container.style.display = "none";
+            }
+        });
+
+        socket.on("messageHasBeenSeen", (msgId) => {
+            const tickEl = document.getElementById(`tick-${msgId}`);
+            if (tickEl) {
+                tickEl.innerText = "✓✓";
+                tickEl.classList.add("seen");
+            }
+        });
+
+        socket.on("bannedError", (msg) => { alert(msg); window.location.reload(); });
+        socket.on("mutedNotice", () => alert("Muted by Admin."));
+        socket.on("clearChatFromServer", () => document.getElementById("messages").innerHTML = "");
+
+        function launchAdminTargetHub(x, y, username, socketId) {
+            selectedTargetSocketId = socketId;
+            document.getElementById("admin-hub-title").innerText = `Target: ${username}`;
+            const hub = document.getElementById("admin-target-hub");
+            hub.style.left = x + "px"; hub.style.top = y + "px"; hub.style.display = "flex";
+        }
+        function closeAdminHub() { document.getElementById("admin-target-hub").style.display = "none"; }
+        function executeHubAction(type) { if(selectedTargetSocketId){ socket.emit(type === 'mute' ? "adminMuteUser" : "adminKickUser", selectedTargetSocketId); closeAdminHub(); } }
+        function adminSpyRoom() { const r = document.getElementById("targetRoomInput").value.trim(); if(r){ currentUsername = "Admin Ghost"; document.getElementById("admin-container").style.display = "none"; document.getElementById("chat-container").style.display = "flex"; socket.emit("joinRoom", { username: currentUsername, room: r }); } }
+        function adminClearChat() { const r = document.getElementById("targetRoomInput").value.trim(); if(r) socket.emit("adminClearRoom", r); }
+        function adminBanRoom() { const r = document.getElementById("targetRoomInput").value.trim(); if(r) socket.emit("adminBanRoom", r); }
+        function toggleSettings() { const menu = document.getElementById("settings-menu"); menu.style.display = (menu.style.display === "flex") ? "none" : "flex"; }
+        function addEmoji(emoji) { document.getElementById("messageInput").value += emoji; }
+        function openLightbox(src) { document.getElementById("lightbox-img").src = src; document.getElementById("lightbox").style.display = "flex"; }
+        function closeLightbox() { document.getElementById("lightbox").style.display = "none"; }
+
+        function startReply(user, text) { replyingTo = { user, text }; document.getElementById("reply-target").innerText = `${user}: ${text}`; document.getElementById("replying-indicator").style.display = "block"; document.getElementById("messageInput").focus(); }
+        function cancelReply() { replyingTo = null; document.getElementById("replying-indicator").style.display = "none"; }
+
+        function generateUniqueId() { return Date.now().toString() + Math.random().toString(36).substr(2, 9); }
+
+        function sendMessage() {
+            const text = document.getElementById("messageInput").value.trim();
+            if(text === "") return;
+            
+            const msgId = generateUniqueId();
+            socket.emit("chatMessage", { id: msgId, text: text, replyData: replyingTo });
+            
+            document.getElementById("messageInput").value = "";
+            cancelReply();
+            localTypingFlag = false;
+            socket.emit("typingState", false);
+        }
+
+        function sendImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) { socket.emit("imageMessage", { id: generateUniqueId(), image: e.target.result }); };
+            reader.readAsDataURL(file);
+            event.target.value = "";
+        }
+
+        let mediaRecorder, audioChunks = [], isRecording = false;
+        async function toggleMic() {
+            const micBtn = document.getElementById("micBtn");
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = () => socket.emit("voiceMessage", { id: generateUniqueId(), audio: reader.result });
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    micBtn.classList.add("recording");
+                } catch (err) { alert("Mic required."); }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                micBtn.classList.remove("recording");
+            }
+        }
+
+        socket.on("message", (data) => {
+            const div = document.createElement("div");
+            div.classList.add("message", data.user === currentUsername ? "me" : "other");
+            if (data.user === "Aizain") div.classList.add("star-msg");
+
+            let html = data.user !== currentUsername ? `<b>${data.user}</b>` : "";
+            if (data.replyData) html += `<div class="reply-box"><b>${data.replyData.user}</b>${data.replyData.text}</div>`;
+
+            if (data.type === "text") html += `<span class="msg-text-content">${data.text}</span>`;
+            else if (data.type === "voice") html += `<audio controls src="${data.audio}"></audio>`;
+            else if (data.type === "image") html += `<img src="${data.image}" onclick="openLightbox(this.src)">`;
+
+            if (data.user === currentUsername) {
+                html += `<div class="msg-meta-row"><span class="tick" id="tick-${data.id}">✓</span></div>`;
+            } else {
+                socket.emit("markAsSeen", data.id);
+            }
+
+            div.innerHTML = html;
+            attachContextInputHooks(div);
+            
+            // COMPLETELY FIXED: Safely appends the message without crashing
+            const messagesContainer = document.getElementById("messages");
+            messagesContainer.appendChild(div);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        });
+
+        socket.on("adminLog", (logData) => {
+            const logDiv = document.createElement("div");
+            logDiv.classList.add("admin-interactive-log-line");
+            logDiv.innerText = logData.text;
+            if (logData.id) logDiv.onclick = (e) => launchAdminTargetHub(e.clientX, e.clientY, logData.username, logData.id);
+            document.getElementById("admin-logs").appendChild(logDiv);
+            document.getElementById("admin-logs").parentElement.scrollTop = document.getElementById("admin-logs").parentElement.scrollHeight;
+        });
+    </script>
+</body>
+</html>
